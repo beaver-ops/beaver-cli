@@ -3,7 +3,7 @@ import type { Api, DbAccess, DbAccessRow } from "../api";
 import type { Command } from "../cli";
 import type { Context } from "../context";
 import { CliError, NotSignedInError } from "../errors";
-import { engineLabel, expiryLabel, levelLabel, placeLabel, shortDate, statusLabel } from "../format";
+import { engineLabel, expiryLabel, fullDate, levelLabel, levelMeaning, placeLabel, relativeTime, shortDate, statusLabel } from "../format";
 import { ensureKeyRegistered, ensureMachineKey } from "../keys";
 import { resolveDb } from "../resolve";
 import { signedInApi } from "../session";
@@ -41,6 +41,8 @@ export const dbList: Command = {
     );
     ui.out(ui.bold(lines[0]));
     for (const l of lines.slice(1)) ui.out(l);
+    ui.out();
+    ui.out(ui.dim(`Details (exact expiry, granted by): beaver db info ${shellArg(formatDb(access.rows[0], access.rows))}  ·  open one: beaver db connect <db>`));
     return 0;
   },
 };
@@ -294,11 +296,29 @@ export const dbConnect: Command = {
   },
 };
 
+/** Level, what it allows, expiry, who granted it and when it was last used: the `db info` block. */
+export function accessLines(ui: Ui, row: DbAccessRow, now: Date): string[] {
+  const label = (s: string) => `  ${s.padEnd(11)}`;
+  const lines = [
+    `${label("Level")}${levelLabel(row)}  ${ui.dim(`(${levelMeaning(row)})`)}`,
+    `${label("Expires")}${row.expiresAt ? `${fullDate(row.expiresAt)} ${ui.dim(`(${relativeTime(row.expiresAt, now)})`)}` : "never"}`,
+    `${label("Status")}${statusLabel(row.status)}`,
+  ];
+  if (row.grantedAt) {
+    const by = row.grantedBy ? ` by ${row.grantedBy.name ? `${row.grantedBy.name} <${row.grantedBy.email}>` : row.grantedBy.email}` : "";
+    lines.push(`${label("Granted")}${fullDate(row.grantedAt)}${by}`);
+  }
+  if (row.lastConnectedAt !== undefined) lines.push(`${label("Last used")}${row.lastConnectedAt ? `${fullDate(row.lastConnectedAt)} ${ui.dim(`(${relativeTime(row.lastConnectedAt, now)})`)}` : ui.dim("never")}`);
+  if (row.expiresAt) lines.push(ui.dim(`  Need it longer, or more than ${levelLabel(row)}? Ask a workspace admin (Database access in Beaver Ops).`));
+  return lines;
+}
+
 export const dbInfo: Command = {
   name: "db info",
   group: "Databases",
   usage: "db info <db>",
-  summary: "Connection details for DBeaver / TablePlus / your app",
+  summary: "Your access (level, expiry, granted by) and connection details",
+  help: "Shows what you may do on the database (level, in SQL terms), when your access ends (your local time),\nwho granted it and when you last used it, then the Host / Port / User for DBeaver, TablePlus or your app\n(they work while beaver db connect runs). --json prints all of it, times in UTC.",
   args: 1,
   flags: [{ name: "json", help: "Print JSON" }],
   async run(ctx, ui, { args, flags }) {
@@ -313,8 +333,7 @@ export const dbInfo: Command = {
     ui.out(`${ui.bold(row.database)}  ${engineLabel(row.cluster.engine)} · ${placeLabel(row)}`);
     ui.out(`  ${"Ref".padEnd(11)}${row.ref}`);
     ui.out(`  ${"Server".padEnd(11)}${row.cluster.name}`);
-    ui.out(`  ${"Level".padEnd(11)}${levelLabel(row)}`);
-    ui.out(`  ${"Expires".padEnd(11)}${row.expiresAt ? shortDate(row.expiresAt, now) : "never"}  ${ui.dim(statusLabel(row.status))}`);
+    for (const l of accessLines(ui, row, now)) ui.out(l);
     ui.out();
     ui.out(`With ${ui.green(`beaver db connect ${shellArg(name)}`)} running:`);
     for (const l of connectionLines(ui, row, access.rows, forwardsOf(row).map((f) => ({ ...f, preferred: f.local })))) ui.out(l);

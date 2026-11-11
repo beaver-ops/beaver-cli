@@ -99,6 +99,7 @@ export const login: Command = {
         ui.out();
         ui.out(`Next: ${ui.green(`beaver db connect ${formatDb(access.rows[0], access.rows)}`)}`);
       }
+      ui.out(ui.dim("All commands: beaver help · help for one: beaver <command> -h"));
     }
     return 0;
   },

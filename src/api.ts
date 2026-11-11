@@ -28,6 +28,11 @@ export type DbAccessRow = {
   level: "read" | "write";
   allowSchema: boolean;
   expiresAt: string | null;
+  /** When and by whom the access was granted; missing on servers older than these fields. */
+  grantedAt?: string;
+  grantedBy?: { name: string | null; email: string } | null;
+  /** Last tunnel the gateway opened for this access (null: never used). */
+  lastConnectedAt?: string | null;
   status: string;
   login: { id: string; pgUser: string; status: string };
   connect: ConnectInfo;
