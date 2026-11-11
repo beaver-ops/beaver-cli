@@ -10,9 +10,12 @@ import { CliError } from "./errors";
 
 /**
  * Host keys of known gateways, shipped with the CLI (`host:port` → `ssh-ed25519 AAAA…`), used with the
- * ones `/api/me/db-access` returns. Fill in production's once its key is published.
+ * ones `/api/me/db-access` returns (a rotation adds the new key there first, then here).
  */
-export const PINNED_GATEWAY_HOST_KEYS: Record<string, string[]> = {};
+export const PINNED_GATEWAY_HOST_KEYS: Record<string, string[]> = {
+  // db-gateway-1 (SHA256:T7y4RMX+8CACY+YGLjOUL64TlGxMSEFvaiDf/1TGAhs)
+  "db.beaverops.ai:2222": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM/veCyqW2D6k5LoWBX+vBMas3sZmYtoK1PliUKYjC/T"],
+};
 
 export type Forward = { label: string; local: number; host: string; port: number };
 export type OpenForward = Forward & { local: number; preferred: number };
