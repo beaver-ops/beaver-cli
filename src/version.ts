@@ -1,5 +1,5 @@
 // The CLI's version (kept equal to package.json's: tests/version.test.ts checks it).
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 
 /** -1 / 0 / 1 comparing `1.2.3`-style versions (anything after a `-` is ignored). */
 export function compareVersions(a: string, b: string): number {
