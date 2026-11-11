@@ -103,6 +103,7 @@ describe("beaver CLI end to end through the DB gateway", () => {
     t.reset();
     expect(await t.run("db", "list")).toBe(0);
     expect(t.stdout()).toMatch(/DATABASE\s+ENGINE\s+PROJECT · ENV\s+LEVEL\s+EXPIRES\s+STATUS\nshop_db\s+Postgres\s+Shop · Production\s+read\s+—\s+active/);
+    expect(t.stdout()).toContain("Details (exact expiry, granted by): beaver db info shop_db");
     t.reset();
     expect(await t.run("whoami")).toBe(0);
     expect(t.stdout()).toContain("Son · son@example.com");
@@ -110,6 +111,10 @@ describe("beaver CLI end to end through the DB gateway", () => {
     expect(await t.run("db", "info", "shop_db")).toBe(0);
     expect(t.stdout()).toContain(`Port       ${localPort}`);
     expect(t.stdout()).toContain("Ref        shop/production/shop_db");
+    expect(t.stdout()).toMatch(/Level {6}read {2}\(SELECT only: no INSERT/);
+    expect(t.stdout()).toContain("Expires    never");
+    expect(t.stdout()).toMatch(/Granted {4}\d+ Nov 2026, \d\d:\d\d by Ly Tran <ly@example.com>/);
+    expect(t.stdout()).toContain("Last used  never");
 
     t.reset();
     expect(await t.run("logout")).toBe(0);

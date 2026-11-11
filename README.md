@@ -10,10 +10,11 @@ beaver db connect shop_db    # tunnel through the DB gateway; prints Host / Port
 beaver db connect shop_db saas   # several at once (one SSH connection per gateway)
 beaver db shell saas         # SQL shell (ClickHouse built in; Postgres opens psql)
 beaver db query saas "SELECT count() FROM events" --format csv
-beaver db info shop_db       # connection details for DBeaver / TablePlus / your app
+beaver db info shop_db       # your access (level, expiry, granted by) + connection details
 beaver db password shop_db   # reset your password on that server (shown once; --remember to keep it here)
 beaver doctor                # what's wrong, and what to do
 beaver update                # newest release (brew upgrade, or the binary replaces itself)
+beaver help                  # every command; beaver <command> -h (or --help) for one
 ```
 
 ## Install

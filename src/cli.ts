@@ -92,6 +92,7 @@ export class Cli {
         "(orders/production/orders_db). Run `beaver db list` to see them.",
       );
     }
+    lines.push("", "Help for one command: beaver help <command>, or add --help (-h): beaver db connect -h");
     return lines.join("\n");
   }
 
@@ -162,7 +163,7 @@ export class Cli {
       }
       const [min, max] = typeof hit.command.args === "number" ? [hit.command.args, hit.command.args] : (hit.command.args ?? [0, 0]);
       if (parsed.args.length < min || parsed.args.length > max) {
-        throw new CliError(`Usage: beaver ${hit.command.usage}${parsed.args.length < min ? "" : ` (unexpected ${JSON.stringify(parsed.args[max])})`}`, 2);
+        throw new CliError(`Usage: beaver ${hit.command.usage}${parsed.args.length < min ? "" : ` (unexpected ${JSON.stringify(parsed.args[max])})`}. More: beaver ${hit.command.name} --help`, 2);
       }
       return await hit.command.run(ctx, ui, parsed);
     } catch (err) {
@@ -178,6 +179,6 @@ export class Cli {
 
   private groupHelp(prefix: string): string {
     const cmds = this.commands.filter((c) => c.name.startsWith(`${prefix} `));
-    return ["Usage: beaver db <command>", "", ...cmds.map((c) => `  ${c.usage.padEnd(25)}${c.summary}`), "", "Run beaver help db <command> for details."].join("\n");
+    return ["Usage: beaver db <command>", "", ...cmds.map((c) => `  ${c.usage.padEnd(25)}${c.summary}`), "", "Details: beaver help db <command>, or beaver db <command> -h"].join("\n");
   }
 }

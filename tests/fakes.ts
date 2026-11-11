@@ -52,6 +52,9 @@ export class FakeBeaver {
         level: "read",
         allowSchema: false,
         expiresAt: null,
+        grantedAt: "2026-11-10T03:00:00.000Z",
+        grantedBy: { name: "Ly Tran", email: "ly@example.com" },
+        lastConnectedAt: null,
         status: "active",
         login: { id: "l1", pgUser: "u_son", status: "active" },
         connect: {
