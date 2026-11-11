@@ -1,0 +1,142 @@
+# A release, on a tag `v<version>` (it must equal package.json's version):
+#   1. tests on Linux and macOS;
+#   2. single binaries with `bun build --compile` (macOS arm64 / x64, Linux x64 / arm64, Windows x64),
+#      each native one checked end to end, packed as beaver-<os>-<arch>.tar.gz (Windows: .zip);
+#   3. a GitHub Release of this repo with the archives, install.sh and checksums.txt (sha256), which is
+#      what `beaver update`, install.sh and the Homebrew tap (beaver-ops/homebrew-tap polls it) read;
+#   4. `npm publish --provenance` of @beaver-ops/cli.
+# Nothing here pushes to another repository.
+#
+# npm: uses the secret NPM_TOKEN while it exists. Once npm Trusted Publishing is set up for
+# @beaver-ops/cli (this repo, workflow release.yml), npm >= 11.5.1 authenticates with the job's OIDC
+# token (id-token: write) and NPM_TOKEN can be deleted; nothing else changes.
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+env:
+  BUN_VERSION: 1.4.4
+jobs:
+  test:
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches package.json
+        run: |
+          want="v$(node -p 'require("./package.json").version')"
+          [ "$GITHUB_REF_NAME" = "$want" ] || { echo "Tag $GITHUB_REF_NAME, but package.json says $want"; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  binaries:
+    needs: test
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # The first target of each runner is native and gets the end-to-end check; the others are cross-built.
+          - { os: macos-latest, targets: "darwin-arm64 darwin-x64", native: darwin-arm64 }
+          - { os: ubuntu-latest, targets: "linux-x64 linux-arm64 windows-x64", native: linux-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: npm ci
+      - run: scripts/build-binaries.sh ${{ matrix.targets }}
+      - name: End-to-end check of the native binary
+        run: BEAVER_BINARY="$PWD/build/bin/beaver-${{ matrix.native }}" npx vitest run tests/e2e.test.ts -t "compiled binary"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: archives-${{ matrix.os }}
+          path: build/release/*
+          if-no-files-found: error
+
+  github-release:
+    needs: binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          pattern: archives-*
+          merge-multiple: true
+      - name: install.sh and checksums.txt
+        working-directory: release
+        run: |
+          cp ../scripts/install.sh .
+          for f in beaver-darwin-arm64.tar.gz beaver-darwin-x64.tar.gz beaver-linux-x64.tar.gz beaver-linux-arm64.tar.gz beaver-windows-x64.zip; do
+            [ -f "$f" ] || { echo "missing $f"; exit 1; }
+          done
+          sha256sum beaver-* install.sh > checksums.txt
+          cat checksums.txt
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cat > notes.md <<EOF
+          beaver $version
+
+          Install:
+          - Homebrew: \`brew install beaver-ops/tap/beaver\`
+          - npm (Node >= 20): \`npm install -g @beaver-ops/cli\`
+          - macOS / Linux: \`curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/latest/download/install.sh | sh\`
+          - Windows: \`beaver-windows-x64.zip\` below.
+
+          Already installed: \`beaver update\`. Checksums: \`checksums.txt\` (sha256).
+
+          macOS without Homebrew: the binary isn't notarized yet; if Gatekeeper blocks it, run \`xattr -d com.apple.quarantine beaver\`.
+          EOF
+          gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "beaver $version" --notes-file notes.md
+
+  npm:
+    needs: github-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      # Trusted Publishing (OIDC) needs npm >= 11.5.1; Node 20 ships npm 10.
+      - run: npm install -g npm@^11.5.1
+      - run: npm ci
+      - run: npm run build
+      - name: Publish @beaver-ops/cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          # A re-run after a successful publish is a no-op (npm never accepts the same version twice).
+          if npm view "@beaver-ops/cli@$version" version >/dev/null 2>&1; then
+            echo "@beaver-ops/cli@$version is already on npm"
+            exit 0
+          fi
+          npm publish --provenance --access public

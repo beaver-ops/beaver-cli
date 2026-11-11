@@ -1,0 +1,58 @@
+# Typecheck, tests (unit + end to end through tests/gateway.ts), the npm build and the single binary
+# (built with Bun, then the end-to-end check run against it), on Linux and macOS.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  # The Bun that builds the single binaries (release.yml uses the same one). 1.3.x hangs on the
+  # compiled-binary check; bump both files together.
+  BUN_VERSION: 1.4.4
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: node dist/beaver.mjs --version
+      - name: The npm package holds only the build
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e '
+            const files = require("./pack.json")[0].files.map((f) => f.path).sort();
+            console.log(files.join("\n"));
+            const bad = files.filter((f) => !["LICENSE", "README.md", "package.json", "dist/beaver.mjs"].includes(f));
+            if (bad.length) { console.error("unexpected files in the package:", bad); process.exit(1); }
+          '
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Single binary, end to end
+        run: |
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            macOS-ARM64) target=darwin-arm64 ;;
+            macOS-X64) target=darwin-x64 ;;
+            Linux-X64) target=linux-x64 ;;
+            Linux-ARM64) target=linux-arm64 ;;
+            *) echo "no target for $RUNNER_OS-$RUNNER_ARCH"; exit 1 ;;
+          esac
+          scripts/build-binaries.sh "$target"
+          BEAVER_BINARY="$PWD/build/bin/beaver-$target" npx vitest run tests/e2e.test.ts -t "compiled binary"

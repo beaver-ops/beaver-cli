@@ -1,0 +1,58 @@
+{
+  "name": "@beaver-ops/cli",
+  "version": "1.0.0",
+  "description": "Beaver Ops CLI: open the databases you were granted with one command",
+  "license": "MIT",
+  "author": "Beaver Ops",
+  "homepage": "https://github.com/beaver-ops/beaver-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beaver-ops/beaver-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/beaver-ops/beaver-cli/issues"
+  },
+  "keywords": [
+    "beaver-ops",
+    "cli",
+    "database",
+    "tunnel",
+    "postgres",
+    "clickhouse"
+  ],
+  "type": "module",
+  "bin": {
+    "beaver": "dist/beaver.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:binary": "scripts/build-binaries.sh",
+    "dev": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "pg": "^8.23.1",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/ssh2": "^1.15.6",
+    "tsup": "^8.5.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  }
+}
